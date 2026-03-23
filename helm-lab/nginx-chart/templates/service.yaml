@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-nginx
+spec:
+  # INTERVIEW: type comes from values — can be overridden per environment
+  # e.g. NodePort for local testing, ClusterIP for production with Ingress
+  type: {{ .Values.service.type }}
+  selector:
+    # INTERVIEW: must match Deployment template labels exactly
+    # mismatch here = Endpoints <none> = 503 from the ALB
+    app: {{ .Release.Name }}-nginx
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 80
+      protocol: TCP

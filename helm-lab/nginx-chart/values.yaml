@@ -1,0 +1,33 @@
+# INTERVIEW: values.yaml is the single place to change behaviour across environments.
+# Override per environment: helm install -f values-prod.yaml
+# Override single value:    helm install --set replicaCount=3
+
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: "1.25-alpine"  # INTERVIEW: never use latest — no rollback guarantee
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+service:
+  type: ClusterIP  # INTERVIEW: ClusterIP + Ingress is cheaper than LoadBalancer per service
+  port: 80
+
+ingress:
+  enabled: true
+  # INTERVIEW: scheme=internet-facing places ALB in public subnets (needs kubernetes.io/role/elb=1 tag)
+  # scheme=internal places ALB in private subnets (internal services only)
+  scheme: internet-facing
+  # INTERVIEW: ip mode routes ALB directly to pod IPs via VPC CNI — one hop, no kube-proxy
+  targetType: ip
+  host: nginx.example.com
+  # INTERVIEW: HTTP for lab — production always uses HTTPS with a real ACM certificate ARN
+  listenPorts: '[{"HTTP": 80}]'

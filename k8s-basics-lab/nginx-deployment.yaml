@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  # INTERVIEW: replicas alone doesn't guarantee HA — you need a PodDisruptionBudget
+  # and pods spread across AZs (topologySpreadConstraints) for true resilience
+  replicas: 2
+
+  # INTERVIEW: selector is immutable after creation — you cannot change it
+  # without deleting and recreating the Deployment
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      # INTERVIEW: these labels must match selector.matchLabels exactly
+      # a mismatch here means the Deployment can never own its pods
+      # this is also what Services use to route traffic — wrong label = 503
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          # INTERVIEW: never use :latest in production — no rollback guarantee,
+          # different nodes may pull different images, breaks reproducibility
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            # INTERVIEW: requests = what the scheduler reserves on the node
+            # limits = hard cap — exceed memory limit and the container is OOMKilled
+            # missing requests = pod can be scheduled on a full node → evicted under pressure
+            # missing limits = one pod can starve all others on the node
+            requests:
+              cpu: 100m    # 0.1 vCPU
+              memory: 64Mi
+            limits:
+              cpu: 250m    # 0.25 vCPU
+              memory: 128Mi
+
+          # INTERVIEW: readinessProbe gates traffic — pod only joins the Service endpoints
+          # when this passes. Without it, traffic hits pods that aren't ready yet → 502/503.
+          # This is what prevents downtime during rolling deployments.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          # INTERVIEW: livenessProbe restarts the container if the app deadlocks or hangs.
+          # Without it, a hung pod stays Running but serves no traffic — silent failure.
+          # initialDelaySeconds must be > readinessProbe delay to avoid restart loops on startup.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20

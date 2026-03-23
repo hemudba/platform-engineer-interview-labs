@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nginx-chart
+description: A minimal nginx Helm chart — lab demonstrating deployment, service, and ingress templating
+type: application
+version: 0.1.0      # chart version — bump this when the chart changes
+appVersion: "1.25"  # version of the app being packaged (nginx)

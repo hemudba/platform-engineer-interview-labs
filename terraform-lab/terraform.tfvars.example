@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars (gitignored) and adjust.
+
+region          = "us-east-2"
+project_name    = "terraform-eks-lab"
+cluster_name    = "lab1-eks"
+cluster_version = "1.29"
+
+# Node group sizing
+node_instance_type = "t3.medium"
+node_min_size      = 1
+node_max_size      = 2
+node_desired_size  = 1
+
+# Optional: tighten CIDRs if they overlap your network.
+# vpc_cidr        = "10.0.0.0/16"
+# public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+# private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# tags = {
+#   Owner = "you"
+# }

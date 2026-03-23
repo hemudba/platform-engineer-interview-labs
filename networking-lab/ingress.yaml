@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  namespace: default
+  annotations:
+    # INTERVIEW: scheme determines which subnets the ALB is placed in
+    # internet-facing → public subnets (needs kubernetes.io/role/elb=1 tag)
+    # internal        → private subnets (needs kubernetes.io/role/internal-elb=1 tag)
+    # wrong scheme = ALB provisioned in wrong subnets or not at all
+    alb.ingress.kubernetes.io/scheme: internet-facing
+
+    # INTERVIEW: ip mode = ALB routes directly to pod IPs via VPC CNI (one hop)
+    # instance mode = ALB → node NodePort → kube-proxy → pod (two hops, higher latency)
+    # ip mode requires VPC CNI — default on EKS, pod IPs are real VPC IPs
+    # use ip mode on EKS — it is faster and avoids double-NAT
+    alb.ingress.kubernetes.io/target-type: ip
+
+    # INTERVIEW: Lab uses HTTP — production always uses HTTPS with certificate-arn
+    # certificate-arn must point to a real ACM cert in the same region as the ALB
+    # placeholder ARN will provision the ALB but fail to create the listener → address stays blank
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
+    # INTERVIEW: ALB uses this path to health-check pods before sending traffic
+    # unhealthy targets are removed from the target group → 503 if all targets fail
+    # must return 200 — if your app returns 301 on / you need to adjust this
+    alb.ingress.kubernetes.io/healthcheck-path: /
+
+spec:
+  # INTERVIEW: ingressClassName replaced the deprecated kubernetes.io/ingress.class annotation
+  # must match what the controller watches — alb = AWS Load Balancer Controller
+  # without this, the controller ignores the Ingress entirely → address never populates
+  ingressClassName: alb
+
+  rules:
+    # INTERVIEW: host-based routing — ALB matches the Host header on incoming requests
+    # no host = catch-all rule (matches everything)
+    # multiple hosts = multiple rules, one ALB (use group.name annotation to share across Ingresses)
+    - host: nginx.example.com
+      http:
+        paths:
+          - path: /
+            # INTERVIEW: Prefix matches /anything starting with /
+            # Exact matches only /  (no trailing paths)
+            # wrong pathType = 404 even though backend is healthy
+            pathType: Prefix
+            backend:
+              service:
+                # INTERVIEW: this name must exactly match the Service metadata.name
+                # typo here = ALB created, listener created, but 503 because no valid target group
+                name: nginx
+                port:
+                  number: 80

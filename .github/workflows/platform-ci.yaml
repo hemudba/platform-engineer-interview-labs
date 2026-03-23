@@ -1,0 +1,175 @@
+---
+# INTERVIEW: This workflow runs on every PR and push to main.
+# It validates infrastructure code (Terraform) and application packaging (Helm)
+# before anything touches a real cluster. CI catches config errors — ArgoCD catches drift.
+
+name: Platform CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# INTERVIEW: Limit to one concurrent run per branch.
+# If a new push arrives while CI is running, cancel the old one.
+# Prevents stale runs from overwriting newer state.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_DIR: terraform-lab
+  HELM_CHART_DIR: helm-lab/nginx-chart
+  AWS_REGION: us-east-2
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Terraform validation
+  # ---------------------------------------------------------------------------
+  # INTERVIEW: fmt --check fails if any file is not formatted.
+  # Forces consistent style — avoids "noisy" diffs where only whitespace changed.
+  # validate checks syntax and provider schema — does NOT require AWS credentials.
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_DIR }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          # INTERVIEW: pin the version — prevents surprises when HashiCorp releases
+          # a new version with changed behaviour mid-sprint
+          terraform_version: "1.7.5"
+
+      # INTERVIEW: init is required before validate because validate needs to
+      # resolve provider schemas from .terraform/providers. Use -backend=false
+      # so init does not try to connect to S3 — no AWS credentials needed in CI.
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      # INTERVIEW: -check flag makes fmt read-only — exits non-zero if formatting differs.
+      # -recursive catches all .tf files in subdirectories.
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      # INTERVIEW: validate confirms all resource blocks are syntactically valid
+      # and that all required arguments are present. Catches typos in resource types,
+      # wrong argument names, missing required fields — all without an AWS call.
+      - name: Terraform Validate
+        run: terraform validate
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Helm lint
+  # ---------------------------------------------------------------------------
+  # INTERVIEW: helm lint validates chart structure, required fields in Chart.yaml,
+  # and template rendering with default values. Catches broken templates before
+  # they reach the cluster — no cluster connection needed.
+  helm-lint:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          # INTERVIEW: pin Helm version — chart API compatibility depends on it
+          version: "v3.14.3"
+
+      - name: Helm Lint
+        run: helm lint ${{ env.HELM_CHART_DIR }}
+
+      # INTERVIEW: helm template renders all manifests with default values.
+      # Pipe to kubeconform to validate against the Kubernetes OpenAPI schema.
+      # Catches invalid field names, wrong types, deprecated API versions
+      # BEFORE anything is applied to the cluster.
+      - name: Render and validate manifests (kubeconform)
+        run: |
+          helm template release ${{ env.HELM_CHART_DIR }} | \
+          docker run --rm -i ghcr.io/yannh/kubeconform:latest \
+            -strict \
+            -kubernetes-version 1.29.0 \
+            -summary
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Terraform Plan (PR only, optional — requires AWS)
+  # ---------------------------------------------------------------------------
+  # INTERVIEW: plan runs only on PRs — shows reviewers exactly what would change
+  # in AWS before merge. Does NOT apply. Requires OIDC + IAM role in AWS.
+  #
+  # Skipped by default so ArgoCD / Helm-only labs stay green without AWS.
+  # To enable: Repo → Settings → Variables → New variable
+  #   Name: ENABLE_TERRAFORM_PLAN_AWS   Value: true
+  # Plus secrets AWS_ACCOUNT_ID and IAM role github-actions-terraform-role.
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && vars.ENABLE_TERRAFORM_PLAN_AWS == 'true'
+    needs: [terraform-validate]
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_DIR }}
+
+    permissions:
+      # INTERVIEW: id-token permission enables OIDC — GitHub requests a JWT
+      # from GitHub's OIDC provider and exchanges it for AWS credentials.
+      # No static access keys stored in GitHub secrets.
+      id-token: write
+      contents: read
+      pull-requests: write   # allows posting the plan output as a PR comment
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # INTERVIEW: role-to-assume uses OIDC federation — GitHub proves its
+          # identity via a signed JWT, AWS issues temporary credentials.
+          # The IAM trust policy restricts this to your specific repo + branch.
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true   # post the plan even if it has errors
+
+      # INTERVIEW: posts the plan diff as a PR comment so reviewers see
+      # exactly what AWS resources will be created, modified, or destroyed.
+      # No one should merge infrastructure changes they haven't read.
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Plan 📋
+            \`\`\`
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            *Pushed by @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

@@ -1,0 +1,36 @@
+{
+    "NatGateways": [
+        {
+            "CreateTime": "2026-03-21T16:29:11+00:00",
+            "DeleteTime": "2026-03-22T03:54:05+00:00",
+            "NatGatewayAddresses": [
+                {
+                    "AllocationId": "eipalloc-04fd6b6653a9a2c0e",
+                    "NetworkInterfaceId": "eni-03fc334dcada96572",
+                    "PrivateIp": "10.0.1.52",
+                    "PublicIp": "16.59.119.159",
+                    "AssociationId": "eipassoc-03d6b7d05c22396a8",
+                    "IsPrimary": true,
+                    "Status": "succeeded"
+                }
+            ],
+            "NatGatewayId": "nat-060de6d9cc1a0feec",
+            "State": "deleted",
+            "SubnetId": "subnet-0e003f4ca3f955d49",
+            "VpcId": "vpc-0527d2314c29b0249",
+            "Tags": [
+                {
+                    "Key": "Project",
+                    "Value": "terraform-eks-lab"
+                },
+                {
+                    "Key": "Name",
+                    "Value": "lab1-eks-nat"
+                }
+            ],
+            "ConnectivityType": "public",
+            "AvailabilityMode": "zonal",
+            "AttachedAppliances": []
+        }
+    ]
+}

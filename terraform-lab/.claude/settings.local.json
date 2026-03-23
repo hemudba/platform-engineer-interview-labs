@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Projects/Cursor/platform-engineer-interview-labs/github-actions-lab/**)",
+      "Read(//d/Projects/Cursor/platform-engineer-interview-labs/argocd-lab/**)"
+    ]
+  }
+}
