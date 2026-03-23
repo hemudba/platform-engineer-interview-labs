@@ -1,0 +1,24 @@
+# Copy to values-datasources.yaml (gitignored locally) and set the workload Prometheus URL.
+# Example: k3d maps workload Prometheus to host port 9091 → from Grafana pod use host access.
+#
+# grafana:
+#   datasources:
+#     datasources.yaml:
+#       apiVersion: 1
+#       datasources:
+#         - name: Workload Prometheus
+#           type: prometheus
+#           url: http://host.docker.internal:9091
+#           access: proxy
+#           isDefault: true
+
+grafana:
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Workload Prometheus
+          type: prometheus
+          url: http://REPLACE_ME_HOST_OR_SERVICE:9090
+          access: proxy
+          isDefault: true

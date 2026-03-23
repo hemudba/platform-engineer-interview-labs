@@ -1,0 +1,16 @@
+# Overlay for dual-cluster: no local Grafana/Alertmanager; forward alerts to central AM on obs cluster.
+# INTERVIEW: use after values-argocd.yaml in Argo CD valueFiles (later file wins on conflicts).
+
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - "REPLACE_ME_OBS_CLUSTER_ALERTMANAGER:9093"

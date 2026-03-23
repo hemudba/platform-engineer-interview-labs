@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-obs-cluster
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+
+  # INTERVIEW: obs-cluster has two upstream charts (grafana + alertmanager).
+  # Each gets its own source entry. Values for both come from obs-cluster/values.yaml
+  # via the shared $values alias on the Git source.
+  sources:
+    # Source 1 — Grafana (central visualization)
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: grafana
+      targetRevision: 10.5.15
+      helm:
+        valueFiles:
+          - $values/observability-lab/helm/obs-cluster/values.yaml
+
+    # Source 2 — Alertmanager (central alert routing)
+    # INTERVIEW: centralizing Alertmanager here means one receiver config, one silence
+    # UI, one on-call wiring. Workload clusters fire alerts and forward them here —
+    # they do not route independently.
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: alertmanager
+      targetRevision: 1.14.0
+      helm:
+        valueFiles:
+          - $values/observability-lab/helm/obs-cluster/values.yaml
+
+    # Source 3 — Git repo, values files only
+    - repoURL: https://github.com/hemudba/platform-engineer-interview-labs
+      targetRevision: HEAD
+      ref: values
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+  # INTERVIEW: ignoreDifferences prevents ArgoCD from flagging Grafana's
+  # auto-generated admin password Secret as drift on every sync.
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: observability-obs-cluster-grafana
+      jsonPointers:
+        - /data/admin-password

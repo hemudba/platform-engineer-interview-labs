@@ -1,0 +1,74 @@
+# Observability cluster: central Grafana + Alertmanager (platform team owned).
+# Install: helm dependency build && helm install obs . -n observability --create-namespace -f values.yaml
+#
+# Workload Prometheus URLs are injected via -f values-datasources.yaml (gitignored locally)
+# or via CI secret — never commit real URLs or credentials here.
+
+grafana:
+  adminUser: admin
+  # INTERVIEW: never commit a real password — use existingSecret or inject from CI vault.
+  adminPassword: changeme
+
+  persistence:
+    enabled: true
+    type: pvc
+    size: 10Gi
+
+  service:
+    type: ClusterIP
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Workload Prometheus endpoints are added via values-datasources.yaml overlay.
+  # INTERVIEW: datasources.yaml is a Grafana provisioning config — loaded at pod start,
+  # no manual UI clicks needed. Changes here = redeploy Grafana pod.
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources: []
+
+# Central Alertmanager — single routing point for all workload clusters.
+# INTERVIEW: centralizing here means one receiver config, one set of silences,
+# one on-call rotation wired to PagerDuty/Slack. Workload clusters disable their
+# own Alertmanager (values-dual-cluster.yaml) and forward alerts to this service.
+alertmanager:
+  persistence:
+    enabled: true
+    size: 2Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # INTERVIEW: config.receivers defines where alerts go (Slack, PagerDuty, email).
+  # config.route defines how alerts are matched to receivers.
+  # Replace with existingSecret in production — never commit webhook URLs.
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ["alertname", "cluster", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: "default"
+
+    receivers:
+      - name: "default"
+        # INTERVIEW: replace with real Slack/PagerDuty receiver in production.
+        # Leaving empty here means alerts are received but not forwarded — visible
+        # in the UI, not sent to an on-call channel.
+
+  service:
+    type: ClusterIP

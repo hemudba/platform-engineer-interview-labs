@@ -1,0 +1,13 @@
+apiVersion: v2
+name: workload-cluster-observability
+description: |
+  Umbrella chart for workload clusters — wraps kube-prometheus-stack (Prometheus Operator,
+  Prometheus, Alertmanager, node-exporter, kube-state-metrics, default rules/dashboards).
+type: application
+version: 0.1.0
+# INTERVIEW: appVersion is our wrapper; dependency carries the upstream stack version.
+appVersion: "1.0"
+dependencies:
+  - name: kube-prometheus-stack
+    version: 82.13.2
+    repository: https://prometheus-community.github.io/helm-charts

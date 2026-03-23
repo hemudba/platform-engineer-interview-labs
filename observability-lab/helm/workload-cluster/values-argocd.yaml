@@ -1,0 +1,39 @@
+# Values for kube-prometheus-stack when installed directly from the Helm registry (Argo CD, helm install).
+# INTERVIEW: no umbrella wrapper — keys match the upstream chart root (not under kube-prometheus-stack:).
+# Keep observability-lab/helm/workload-cluster/values.yaml in sync semantically with this file for umbrella installs.
+
+grafana:
+  enabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 15GB
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeScheduler: false
+    kubeControllerManager: false
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi

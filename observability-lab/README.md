@@ -18,12 +18,14 @@ Understand what to monitor first in a new cluster and how to separate symptoms f
 - resource saturation
 
 ## Files
-- `prometheus/alert-rules.yaml`
-- `grafana/dashboard-notes.md`
-- `observability-runbook.md`
+- `argocd/` — **GitOps**: multi-source Applications (Helm registry + Git values via `$values`); see `argocd/README.md`
+- `helm/` — **Helm CLI / umbrella charts**: same versions as Argo CD path (see `helm/README.md`)
+- `prometheus/alert-rules.yaml` (add when you author rules)
+- `grafana/dashboard-notes.md` (add for lab notes)
+- `observability-runbook.md` (add for runbook)
 
 ## Commands
-Document relevant commands and UI checks here.
+See `helm/README.md` for `helm dependency build`, `helm install`, and value overlays (`values-dual-cluster.yaml`). Document UI checks and `kubectl` port-forwards here as you run the lab.
 
 ## Mini Practical
 - pick one failing or noisy target

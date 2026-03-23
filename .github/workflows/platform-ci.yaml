@@ -21,6 +21,8 @@ concurrency:
 env:
   TF_DIR: terraform-lab
   HELM_CHART_DIR: helm-lab/nginx-chart
+  HELM_OBS_WORKLOAD: observability-lab/helm/workload-cluster
+  HELM_OBS_GRAFANA: observability-lab/helm/obs-cluster
   AWS_REGION: us-east-2
 
 jobs:
@@ -86,8 +88,22 @@ jobs:
           # INTERVIEW: pin Helm version — chart API compatibility depends on it
           version: "v3.14.3"
 
+      - name: Helm repo add (observability upstream charts)
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+      - name: Helm dependency build (observability umbrella charts)
+        run: |
+          helm dependency build ${{ env.HELM_OBS_WORKLOAD }}
+          helm dependency build ${{ env.HELM_OBS_GRAFANA }}
+
       - name: Helm Lint
-        run: helm lint ${{ env.HELM_CHART_DIR }}
+        run: |
+          helm lint ${{ env.HELM_CHART_DIR }}
+          helm lint ${{ env.HELM_OBS_WORKLOAD }}
+          helm lint ${{ env.HELM_OBS_GRAFANA }}
 
       # INTERVIEW: helm template renders all manifests with default values.
       # Pipe to kubeconform to validate against the Kubernetes OpenAPI schema.

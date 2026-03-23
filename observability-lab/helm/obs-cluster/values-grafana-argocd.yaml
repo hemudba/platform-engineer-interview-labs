@@ -1,0 +1,26 @@
+# Values for grafana/grafana chart when installed from the Helm registry (Argo CD).
+# INTERVIEW: root keys match upstream grafana chart — not nested under grafana: (umbrella only).
+
+adminUser: admin
+adminPassword: changeme
+
+persistence:
+  enabled: true
+  type: pvc
+  size: 10Gi
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources: []

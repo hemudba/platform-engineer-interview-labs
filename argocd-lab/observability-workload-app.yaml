@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-workload
+  namespace: argocd
+  # INTERVIEW: finalizer ensures ArgoCD deletes all managed resources when the
+  # Application is deleted — without it, Prometheus/Alertmanager pods are orphaned.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  # INTERVIEW: two sources is the key pattern for upstream Helm charts + Git values.
+  # Source 1 = chart from Helm registry (no tarballs in git, no dependency build step).
+  # Source 2 = values files from your Git repo, referenced via the $values alias.
+  # This replaces the umbrella chart pattern entirely.
+  sources:
+    # Source 1 — upstream chart, pinned to exact version
+    # INTERVIEW: targetRevision pins the chart version the same way Chart.yaml does.
+    # Bumping this = a Git commit = reviewable, auditable, rollbackable via ArgoCD.
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 82.13.2
+      helm:
+        # INTERVIEW: $values is the alias for source 2 (the Git repo).
+        # ArgoCD merges both value files before rendering — same as helm install -f a -f b.
+        # values.yaml = base config, values-dual-cluster.yaml = overlay that disables
+        # local Grafana and Alertmanager (they live on the obs-cluster instead).
+        valueFiles:
+          - $values/observability-lab/helm/workload-cluster/values.yaml
+          - $values/observability-lab/helm/workload-cluster/values-dual-cluster.yaml
+
+    # Source 2 — Git repo, values files only (no chart here)
+    # INTERVIEW: ref: HEAD means always use the latest commit on the target branch.
+    # In production pin to a branch or tag so drift is intentional, not accidental.
+    - repoURL: https://github.com/hemudba/platform-engineer-interview-labs
+      targetRevision: HEAD
+      ref: values
+
+  syncPolicy:
+    automated:
+      # INTERVIEW: prune removes resources deleted from the chart on the next sync.
+      # Without it, old CRDs and ServiceMonitors pile up after upgrades.
+      prune: true
+      # INTERVIEW: selfHeal reverts any manual kubectl edits within ~3 minutes.
+      # Git is the only source of truth — no ad-hoc changes survive.
+      selfHeal: true
+    syncOptions:
+      # INTERVIEW: kube-prometheus-stack ships large CRDs (PrometheusRule, ServiceMonitor).
+      # Without ServerSideApply, kubectl apply hits the 256kb annotation limit on CRD objects.
+      - ServerSideApply=true
+      - CreateNamespace=true

@@ -1,0 +1,5 @@
+# Vendored Helm dependency archives (rebuild with: helm dependency build)
+observability-lab/helm/*/charts/*.tgz
+
+# Local datasource overrides (may contain internal URLs)
+observability-lab/helm/obs-cluster/values-datasources.yaml

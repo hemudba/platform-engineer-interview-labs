@@ -1,0 +1,31 @@
+# Values for prometheus-community/alertmanager chart when installed from the Helm registry (Argo CD).
+# INTERVIEW: root keys match upstream alertmanager chart.
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+config:
+  global:
+    resolve_timeout: 5m
+
+  route:
+    group_by: ["alertname", "cluster", "namespace"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
+    receiver: "default"
+
+  receivers:
+    - name: "default"
+
+service:
+  type: ClusterIP

@@ -1,0 +1,48 @@
+---
+# INTERVIEW: Multi-source Application — Helm chart from a public repo + values from Git ($values ref).
+# Requires Argo CD 2.6+. Chart versions match Chart.lock in observability-lab/helm/workload-cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-workload
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    env: lab
+    observability: workload
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: "82.13.2"
+      helm:
+        releaseName: kps
+        valueFiles:
+          - $values/observability-lab/helm/workload-cluster/values-argocd.yaml
+          - $values/observability-lab/helm/workload-cluster/values-argocd-dual-cluster.yaml
+    - repoURL: https://github.com/hemudba/platform-engineer-interview-labs
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        argocd.argoproj.io/instance: observability-workload
+        env: lab
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      # INTERVIEW: kube-prometheus-stack ships large CRDs (PrometheusRule, ServiceMonitor).
+      # Without ServerSideApply, kubectl apply hits the 256kb last-applied-configuration
+      # annotation limit on CRD objects and the first sync fails with "metadata too large".
+      - ServerSideApply=true

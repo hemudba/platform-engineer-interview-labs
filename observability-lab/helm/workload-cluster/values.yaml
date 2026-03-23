@@ -1,0 +1,61 @@
+# Values passed to dependency kube-prometheus-stack (Prometheus Operator + full stack).
+# Install: helm dependency build && helm install kps . -n monitoring --create-namespace -f values.yaml
+#
+# INTERVIEW: tune retention, storage, and defaultRules in production — defaults are lab-friendly.
+
+kube-prometheus-stack:
+  # Single-cluster lab: leave Grafana enabled here. For central Grafana on obs-cluster,
+  # install obs-cluster chart and set grafana.enabled: false below.
+  grafana:
+    enabled: true
+
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      retentionSize: 15GB
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+
+      # INTERVIEW: remote_write ships a copy of all scraped metrics to a central TSDB
+      # (Thanos receiver, Grafana Mimir, or Cortex). This removes the dependency on
+      # cross-cluster network for queries — Grafana reads from the TSDB, not directly
+      # from each workload Prometheus. Queries stay fast even if a workload cluster is down.
+      #
+      # In production, scope what you ship with writeRelabelConfigs to avoid cost explosion.
+      # Uncommenting without a TSDB endpoint will cause Prometheus to log remote write errors.
+      #
+      # remoteWrite:
+      #   - url: "http://REPLACE_ME_TSDB_ENDPOINT/api/v1/push"
+      #     writeRelabelConfigs:
+      #       - sourceLabels: [__name__]
+      #         action: keep
+      #         regex: "up|node_.*|container_.*|kube_.*"
+
+  # INTERVIEW: in single-cluster mode Alertmanager runs here and routes alerts directly.
+  # In dual-cluster mode this is disabled via values-dual-cluster.yaml overlay and
+  # Prometheus forwards alerts to the central Alertmanager on the obs-cluster instead.
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+
+  defaultRules:
+    create: true
+    rules:
+      etcd: false
+      kubeScheduler: false
+      kubeControllerManager: false
+
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi

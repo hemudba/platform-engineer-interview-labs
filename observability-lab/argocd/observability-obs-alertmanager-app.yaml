@@ -1,0 +1,44 @@
+---
+# INTERVIEW: Central Alertmanager — chart from prometheus-community + values from Git.
+# Argo CD cannot install two Helm charts in a single Application; split obs stack into two Apps.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-obs-alertmanager
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    env: lab
+    observability: obs
+    component: alertmanager
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: alertmanager
+      targetRevision: "1.14.0"
+      helm:
+        releaseName: central-alertmanager
+        valueFiles:
+          - $values/observability-lab/helm/obs-cluster/values-alertmanager-argocd.yaml
+    - repoURL: https://github.com/hemudba/platform-engineer-interview-labs
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+
+  syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        argocd.argoproj.io/instance: observability-obs-alertmanager
+        env: lab
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground

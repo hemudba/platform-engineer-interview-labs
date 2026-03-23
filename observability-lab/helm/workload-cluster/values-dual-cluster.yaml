@@ -1,0 +1,42 @@
+# Dual-cluster overlay: workload cluster scrapes metrics only.
+# Visualization (Grafana) and alert routing (Alertmanager) live on the obs-cluster.
+#
+# Apply: helm install kps . -n monitoring --create-namespace -f values.yaml -f values-dual-cluster.yaml
+#
+# INTERVIEW: this overlay enforces the architecture boundary —
+# workload cluster = scrape reliability only, obs-cluster = visualization + routing.
+
+kube-prometheus-stack:
+  # INTERVIEW: Grafana disabled — central Grafana on obs-cluster is the single pane of glass.
+  # Avoids duplicate dashboards and split brain between cluster-local and central views.
+  grafana:
+    enabled: false
+
+  # INTERVIEW: Alertmanager disabled — central Alertmanager on obs-cluster handles routing.
+  # Workload Prometheus still evaluates rules and fires alerts; it forwards them to the
+  # central Alertmanager via prometheusSpec.alerting.alertmanagers (set below).
+  alertmanager:
+    enabled: false
+
+  prometheus:
+    prometheusSpec:
+      # INTERVIEW: tells Prometheus where to send firing alerts.
+      # Without this, disabling local Alertmanager = alerts fire but go nowhere.
+      # Replace the URL with the obs-cluster Alertmanager service endpoint or LB.
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets:
+                  - "REPLACE_ME_OBS_CLUSTER_ALERTMANAGER:9093"
+
+      # INTERVIEW: remote_write ships metrics to a shared TSDB (Thanos, Mimir, Cortex).
+      # Benefit: Grafana queries the TSDB directly — no cross-cluster network hop needed.
+      # Queries are fast and reliable even if the workload cluster is unreachable.
+      # Comment this out if no central TSDB is available (lab default).
+      #
+      # remoteWrite:
+      #   - url: "http://REPLACE_ME_TSDB_ENDPOINT/api/v1/push"
+      #     writeRelabelConfigs:
+      #       - sourceLabels: [__name__]
+      #         action: keep
+      #         regex: "up|node_.*|container_.*|kube_.*"
