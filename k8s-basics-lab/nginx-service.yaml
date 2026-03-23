@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  # INTERVIEW: ClusterIP = internal only, reachable inside the cluster via DNS
+  # nginx.default.svc.cluster.local resolves to this service's ClusterIP
+  # other types: NodePort (exposes on every node), LoadBalancer (provisions NLB per service)
+  # on EKS, prefer ClusterIP + Ingress over LoadBalancer — one ALB for many services is cheaper
+  type: ClusterIP
+
+  # INTERVIEW: selector is how the Service finds its pods — it watches Endpoints
+  # if this label doesn't match any running pod, Endpoints = <none> → 503
+  # this is the #1 cause of 503s — always check: kubectl get endpoints <name>
+  selector:
+    app: nginx
+
+  ports:
+    # INTERVIEW: port = what clients call (service port)
+    # targetPort = what the container listens on (pod port)
+    # they can differ — e.g. port: 80, targetPort: 8080 if app runs on 8080
+    - port: 80
+      targetPort: 80
+      protocol: TCP

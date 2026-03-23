@@ -1,0 +1,69 @@
+---
+# INTERVIEW: ArgoCD Application is the core resource — it tells ArgoCD:
+# WHERE the desired state lives (source: git repo + path)
+# WHERE to deploy it (destination: cluster + namespace)
+# HOW to sync (syncPolicy: automatic or manual)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-frontend
+  # INTERVIEW: Applications always live in the argocd namespace —
+  # not in the target namespace. ArgoCD manages them from here.
+  namespace: argocd
+  labels:
+    app: nginx-frontend
+    env: lab
+    app.kubernetes.io/managed-by: argocd
+
+spec:
+  # INTERVIEW: project scopes what this app can deploy to and from.
+  # "default" project allows everything — production uses custom projects
+  # to restrict which repos and namespaces each team can touch.
+  project: default
+
+  source:
+    # INTERVIEW: replace with your actual repo URL
+    repoURL: https://github.com/hemudba/platform-engineer-interview-labs
+    targetRevision: main   # INTERVIEW: pin to a branch, tag, or commit SHA
+    path: helm-lab/nginx-chart
+
+    # INTERVIEW: helm block tells ArgoCD to render this path as a Helm chart
+    # ArgoCD runs `helm template` internally — does NOT require Helm installed on the cluster
+    helm:
+      # ArgoCD release name — shown on Helm labels (app.kubernetes.io/instance) in the target ns
+      releaseName: frontend-argocd
+      # INTERVIEW: values override per environment — same chart, different values files
+      # valueFiles:
+      #   - values-prod.yaml
+
+  destination:
+    # INTERVIEW: https://kubernetes.default.svc = the cluster ArgoCD is running in (in-cluster)
+    # For remote clusters, use the cluster API server URL registered with ArgoCD
+    server: https://kubernetes.default.svc
+    # Suffix keeps ArgoCD-managed workloads distinct from ad-hoc namespaces
+    namespace: nginx-frontend-argocd
+
+  syncPolicy:
+    # Labels applied to the destination namespace when CreateNamespace=true (Argo CD 2.6+)
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        argocd.argoproj.io/instance: nginx-frontend
+        env: lab
+    # INTERVIEW: automated sync = ArgoCD reconciles every 3 minutes (default poll interval)
+    # or immediately on a git webhook. No manual `argocd app sync` needed.
+    automated:
+      # INTERVIEW: prune = delete resources that exist in the cluster but NOT in git.
+      # Without this, deleted manifests leave orphaned resources in the cluster.
+      prune: true
+      # INTERVIEW: selfHeal = if someone kubectl applies a change directly to the cluster
+      # (out-of-band), ArgoCD detects drift and reverts it back to git state.
+      # This is the core of GitOps — git is the single source of truth.
+      selfHeal: true
+
+    syncOptions:
+      # INTERVIEW: creates the namespace if it does not exist — prevents sync failures
+      # on first deploy to a new namespace
+      - CreateNamespace=true
+      # INTERVIEW: shows a diff of what will change before applying (like terraform plan)
+      - PrunePropagationPolicy=foreground

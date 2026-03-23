@@ -1,0 +1,41 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-nginx
+  annotations:
+    # INTERVIEW: scheme determines which subnets the ALB lands in
+    # internet-facing = public subnets (needs kubernetes.io/role/elb=1 tag on subnet)
+    # internal        = private subnets (needs kubernetes.io/role/internal-elb=1 tag)
+    alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme }}
+
+    # INTERVIEW: ip mode = ALB → pod IP directly via VPC CNI (one hop)
+    # instance mode = ALB → node NodePort → kube-proxy → pod (two hops)
+    alb.ingress.kubernetes.io/target-type: {{ .Values.ingress.targetType }}
+
+    # INTERVIEW: HTTP for lab — production sets HTTPS + certificate-arn
+    # placeholder ARN provisions the ALB but fails listener creation → address stays blank
+    alb.ingress.kubernetes.io/listen-ports: {{ .Values.ingress.listenPorts | squote }}
+
+    alb.ingress.kubernetes.io/healthcheck-path: /
+spec:
+  # INTERVIEW: ingressClassName replaced deprecated kubernetes.io/ingress.class annotation
+  # must match what the controller watches — without this the Ingress is ignored entirely
+  ingressClassName: alb
+  rules:
+    # INTERVIEW: host-based routing — ALB matches the Host header on incoming requests
+    # browser hitting the ALB URL directly sends wrong Host → 404 (correct behaviour)
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            # INTERVIEW: Prefix matches /anything, Exact matches only /
+            # wrong pathType = 404 even when backend is healthy
+            pathType: Prefix
+            backend:
+              service:
+                # INTERVIEW: must match Service metadata.name exactly — typo = 503
+                name: {{ .Release.Name }}-nginx
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}
