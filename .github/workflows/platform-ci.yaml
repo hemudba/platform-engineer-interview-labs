@@ -102,16 +102,19 @@ jobs:
             -summary
 
   # ---------------------------------------------------------------------------
-  # Job 3: Terraform Plan (PR only)
+  # Job 3: Terraform Plan (PR only, optional — requires AWS)
   # ---------------------------------------------------------------------------
-  # INTERVIEW: plan runs only on PRs — shows reviewers exactly what will change
-  # in AWS before merge. Does NOT apply. Requires AWS credentials.
-  # Production pattern: OIDC federated identity (no static keys stored in secrets).
+  # INTERVIEW: plan runs only on PRs — shows reviewers exactly what would change
+  # in AWS before merge. Does NOT apply. Requires OIDC + IAM role in AWS.
+  #
+  # Skipped by default so ArgoCD / Helm-only labs stay green without AWS.
+  # To enable: Repo → Settings → Variables → New variable
+  #   Name: ENABLE_TERRAFORM_PLAN_AWS   Value: true
+  # Plus secrets AWS_ACCOUNT_ID and IAM role github-actions-terraform-role.
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    # INTERVIEW: only run on PRs — not on push to main (apply is a separate pipeline)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.ENABLE_TERRAFORM_PLAN_AWS == 'true'
     needs: [terraform-validate]
 
     defaults:
