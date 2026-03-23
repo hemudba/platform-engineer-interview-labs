@@ -20,7 +20,7 @@ data "aws_availability_zones" "available" {
 # ── VPC ───────────────────────────────────────────────────────────────────────
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
-  enable_dns_hostnames = true  # required for EKS node registration
+  enable_dns_hostnames = true # required for EKS node registration
   enable_dns_support   = true
 
   tags = { Name = "${var.cluster_name}-vpc" }
@@ -45,7 +45,7 @@ resource "aws_subnet" "public" {
   tags = {
     Name                                        = "${var.cluster_name}-public-${count.index + 1}"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                    = "1"  # marks subnets for internet-facing LBs
+    "kubernetes.io/role/elb"                    = "1" # marks subnets for internet-facing LBs
   }
 }
 
@@ -60,7 +60,7 @@ resource "aws_subnet" "private" {
   tags = {
     Name                                        = "${var.cluster_name}-private-${count.index + 1}"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-    "kubernetes.io/role/internal-elb"           = "1"  # marks subnets for internal LBs
+    "kubernetes.io/role/internal-elb"           = "1" # marks subnets for internal LBs
   }
 }
 
@@ -147,7 +147,7 @@ resource "aws_eks_cluster" "this" {
     subnet_ids              = aws_subnet.private[*].id
     endpoint_public_access  = true
     endpoint_private_access = true
-    public_access_cidrs     = ["45.27.133.147/32"]  # restrict public endpoint to your IP
+    public_access_cidrs     = ["45.27.133.147/32"] # restrict public endpoint to your IP
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]
